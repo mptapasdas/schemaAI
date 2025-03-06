@@ -104,7 +104,7 @@ async def visualize_schema():
         graph.node(table.name, table.name, shape="box", style="filled", fillcolor="lightblue")
 
         # Add columns as nodes
-        for column in metadata.tables:
+        for table in metadata.tables:
             column_details = table.columns[column]  # Corrected column access
             column_label = f"{column}\nType: {column_details.type}\n"
             column_label += f"Nullable: {column_details.nullable}\n"
