@@ -5,31 +5,31 @@ from sqlalchemy import create_engine, MetaData, text
 from sqlalchemy.exc import SQLAlchemyError
 from graphviz import Digraph
 from pydantic import BaseModel
-from openai import OpenAI
+from ollama import Client
 import os
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-environment = "development"  # Change to "production" as needed
 engine = create_engine(DATABASE_URL)
 metadata = MetaData()
 metadata.reflect(bind=engine)
 
+client = Client(host="http://localhost:11434")
 app = FastAPI()
-client = OpenAI(api_key=OPENAI_API_KEY)
 
 class SchemaUpdateRequest(BaseModel):
-    command: str  # Natural language command from user
+    command: str
 
 async def generate_sql(nl_command: str) -> str:
-    prompt = f"Convert this command into SQL: {nl_command}"
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo", messages=[{"role": "user", "content": prompt}]
+    prompt = f"Convert this command into just SQL command without any formatting. {nl_command}. Just give the sql command without any formatting. Nothing else strictly."
+    response = client.chat(
+        model="llama3.2:1b", #replace this with the model that you are using
+        messages=[{"role": "user", "content": prompt}]
     )
     print(response)
-    return response.choices[0].message.content.strip()
+    return response["message"]["content"].strip()
+
 
 def execute_sql(sql: str):
     try:
@@ -48,9 +48,8 @@ async def update_schema(request: SchemaUpdateRequest):
 
 @app.get("/get-schema")
 def get_schema():
-    # Reflect the schema if it's not already reflected
     metadata.reflect(bind=engine)
-    
+
     schema_info = {}
 
     for table in metadata.tables.values():
@@ -58,7 +57,7 @@ def get_schema():
         for column in table.columns:
             column_details = {
                 "name": column.name,
-                "type": str(column.type),  # Data type of the column
+                "type": str(column.type),
                 "nullable": column.nullable,
                 "default": column.default,
                 "primary_key": column.primary_key,
